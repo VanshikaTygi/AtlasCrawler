@@ -1,9 +1,10 @@
 import aiohttp
 import asyncio
-import ssl
-import certifi
-import json
 import time
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import save_to_json, create_ssl_connector
 
 HN_SEARCH_URL = "http://hn.algolia.com/api/v1/search_by_date"
 
@@ -36,13 +37,8 @@ async def fetch_recent_ai_news(session, hours_back=24, per_page=100, max_pages=1
         await asyncio.sleep(1)
     return all_articles
 
-def save_to_json(data, filepath):
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
 async def main():
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
-    connector = aiohttp.TCPConnector(ssl=ssl_context)
+    connector = create_ssl_connector()
     async with aiohttp.ClientSession(connector=connector) as session:
         articles = await fetch_recent_ai_news(session)
         print(f"Total fetched: {len(articles)} articles from the last 24 hours")

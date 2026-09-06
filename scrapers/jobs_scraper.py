@@ -1,11 +1,12 @@
 import aiohttp
 import asyncio
-import ssl
-import certifi
-import json
 import time
 from datetime import datetime, timezone
 import re
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import save_to_json, create_ssl_connector
 
 REMOTEOK_URL = "https://remoteok.com/api"
 
@@ -58,13 +59,8 @@ async def fetch_ai_jobs(session, hours_back=24):
 
     return recent_ai_jobs
 
-def save_to_json(data, filepath):
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
 async def main():
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
-    connector = aiohttp.TCPConnector(ssl=ssl_context)
+    connector = create_ssl_connector()
     async with aiohttp.ClientSession(connector=connector) as session:
         jobs = await fetch_ai_jobs(session)
         print(f"Total fetched: {len(jobs)} AI jobs from the last 24 hours")

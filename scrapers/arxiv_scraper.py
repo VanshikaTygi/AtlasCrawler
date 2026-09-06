@@ -1,17 +1,13 @@
 import aiohttp
 import asyncio
 import xml.etree.ElementTree as ET
-import ssl
-import certifi
-import json
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import save_to_json, create_ssl_connector
 
 
 ARXIV_API_URL = "http://export.arxiv.org/api/query"
-
-
-def save_to_json(data, filepath):
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
 async def fetch_arxiv_papers(session, query="artificial intelligence", total_needed=1200, batch_size=100):
@@ -47,14 +43,13 @@ def parse_arxiv_response(xml_text):
     return papers
 
 async def main():
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
-    connector = aiohttp.TCPConnector(ssl=ssl_context)
+    connector = create_ssl_connector()
     async with aiohttp.ClientSession(connector=connector) as session:
         papers = await fetch_arxiv_papers(session)
         print(f"Total fetched: {len(papers)} papers")
         save_to_json(papers, "data/papers.json")
         print("Saved to data/papers.json")
-        
+
 
 if __name__ == "__main__":
     asyncio.run(main())

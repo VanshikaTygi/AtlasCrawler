@@ -1,6 +1,9 @@
 import asyncio
-import json
 from playwright.async_api import async_playwright
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import save_to_json, create_ssl_connector
 
 YC_URL = "https://www.ycombinator.com/companies"
 
@@ -17,9 +20,9 @@ async def fetch_yc_companies(max_companies=200):
             cards = await page.query_selector_all("a[href^='/companies/']")
             companies = []
 
-            print(f"Found {len(cards)} company card elements")
-            if cards:
-                print("Sample card HTML:", await cards[0].inner_html())
+            # print(f"Found {len(cards)} company card elements")
+            # if cards:
+            #     print("Sample card HTML:", await cards[0].inner_html())
                 
             for card in cards:
                 name_el = await card.query_selector("span[class*='_coName_']")
@@ -37,10 +40,6 @@ async def fetch_yc_companies(max_companies=200):
 
         await browser.close()
     return companies
-
-def save_to_json(data, filepath):
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
 
 async def main():
     companies = await fetch_yc_companies()

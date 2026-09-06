@@ -1,8 +1,9 @@
 import aiohttp
 import asyncio
-import ssl
-import certifi
-import json
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import save_to_json, create_ssl_connector
 
 HN_API_URL = "https://hn.algolia.com/api/v1/search"
 
@@ -32,13 +33,8 @@ async def fetch_show_hn_posts(session, total_needed=1200, per_page=100):
         await asyncio.sleep(1)
     return all_posts
 
-def save_to_json(data, filepath):
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
 async def main():
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
-    connector = aiohttp.TCPConnector(ssl=ssl_context)
+    connector = create_ssl_connector()
     async with aiohttp.ClientSession(connector=connector) as session:
         posts = await fetch_show_hn_posts(session)
         print(f"Total fetched: {len(posts)} posts")
