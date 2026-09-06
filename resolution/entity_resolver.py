@@ -4,7 +4,13 @@ KNOWN_ENTITIES = [
     "OpenAI", "Anthropic", "Google DeepMind", "Meta AI", "Mistral AI",
     "Cohere", "Hugging Face", "Stability AI", "xAI", "Perplexity AI",
     "Groq", "Together AI", "Runway", "Midjourney", "Character AI",
-    "Inflection AI", "Adept AI", "Scale AI", "Databricks", "NVIDIA"
+    "Inflection AI", "Adept AI", "Scale AI", "Databricks", "NVIDIA",
+    "Cerebras", "SambaNova", "AI21 Labs", "Aleph Alpha", "Writer",
+    "Jasper", "Synthesia", "ElevenLabs", "Pika Labs", "Luma AI",
+    "Glean", "Sierra", "Harvey", "Cursor", "Replit",
+    "LangChain", "LlamaIndex", "Weights & Biases", "Pinecone", "Chroma",
+    "Modal", "Baseten", "Fireworks AI", "OctoAI", "Lambda Labs",
+    "CoreWeave", "Suno", "Cognition", "Poolside", "Imbue"
 ]
 
 def resolve_entity_name(raw_name, threshold=85):
