@@ -1,0 +1,45 @@
+# AtlasCrawler — Architecture & Production Design
+
+## 1. Scale Strategy: Collecting 500,000+ Records
+
+The current pipeline uses the same core pattern across every source — async fetch, paginate, structure, store — which is designed to scale horizontally rather than by rewriting logic. To reach 500,000+ records without manual intervention, the approach would be:
+
+- **Parallelize by source, not just by page.** Each scraper (Arxiv, HN, RemoteOK, YC) is already independent and async; running many source-specific workers concurrently, each handling its own pagination loop, scales linearly with added compute rather than code changes.
+- **Move from a single-machine loop to a distributed task queue** (e.g., Celery or a cloud queue service) where each "page fetch" becomes an independent job, allowing thousands of pages to be processed across multiple worker machines simultaneously.
+- **Replace fixed `total_needed` limits with cursor-based continuation** stored externally (e.g., in a database), so a crawl can pause, resume, and be re-triggered on a schedule without re-fetching already-collected data.
+- Infrastructure scaling (more workers, more machines) handles volume growth; the scraping logic itself does not need to change.
+
+## 2. Handling 413s and 429s at Scale
+
+The current LLM extraction engine implements a 3-provider fallback chain (Gemini → Groq → Mistral): if one provider fails for any reason, including a 429, the request moves to the next provider immediately.
+
+At production scale across thousands of concurrent extractions, this would be extended with:
+
+- **Exponential backoff with jitter on 429s** before falling back to the next provider — retrying the same provider after a short, randomized delay first, since a single rate-limit hit doesn't always mean the whole provider is unavailable.
+- **Pre-emptive chunking for 413s**: measuring input text length before sending, and splitting any text exceeding a safe token threshold into smaller, semantically coherent chunks (e.g., by paragraph) processed separately, then merging the structured results.
+- **A shared rate-limiter per provider**, tracking recent request counts so the system slows itself down proactively rather than discovering a rate limit reactively through failures.
+
+## 3. Freshness Tracking Across Distributed Nodes
+
+The current implementation filters by comparing each item's timestamp against a cutoff calculated at runtime (`now - 24 hours`), which works correctly for a single run but would need to evolve for distributed, repeated crawling:
+
+- **A shared "last seen" store** (e.g., a Redis set or a database table of already-processed URLs/IDs) that every crawler node checks against before processing an item, preventing the same article or job from being ingested twice across separate machines or separate runs.
+- **Per-source watermarking**: storing the timestamp of the most recently processed item for each source, so the next run only requests items newer than that watermark, rather than re-filtering the entire recent window every time.
+
+## 4. Storage Strategy
+
+For a system of this shape, a two-tier storage approach is justified:
+
+- **Primary database — PostgreSQL**: structured entity data (startups, papers, jobs, news) fits a relational model well, and Postgres's JSONB columns allow flexible fields (like `authors` or `tags`) to coexist with strict typed columns for things like timestamps and canonical names — useful given how much of this data has partially variable structure per source.
+- **Graph storage — Neo4j (or a similar graph database) for relationship mapping**: the "Intelligence Graph" nature of this project — companies linked to products, products linked to research papers, people linked to companies via jobs — is fundamentally relational in a way that's awkward to query repeatedly in a pure relational schema. A graph database would let queries like "show all papers connected to startups that raised funding this month" run naturally, rather than requiring complex multi-table joins.
+- Vector storage (e.g., Pinecone or pgvector) would be added later specifically for semantic search over paper abstracts/descriptions, which is outside this trial's current scope but a natural next step.
+
+## Known Scope Decisions & Limitations
+
+Built under the trial's time constraints, the following are honest, deliberate scope reductions rather than oversights:
+
+- **News and Jobs use one source each** (Hacker News, RemoteOK) rather than five, to prioritize building a complete, correct end-to-end pipeline over partial coverage across many sources. The scraper pattern used is source-agnostic and would extend to additional sources without architectural changes.
+- **Research papers do not currently include GitHub star tracking or Papers with Code correlation.** Arxiv's data was used as the primary paper source given its clean, free API; extending this to pull associated GitHub metrics is a natural next addition using the same async-fetch pattern already in place.
+- **The output schema uses flat, simplified field names** rather than the fully nested `content.*` schema specified in the brief, to keep the pipeline's first working version simpler to build and debug. Mapping to the target schema would be a mechanical transformation step applied at the Sheets-push stage.
+- **DeepSeek was excluded from the LLM fallback chain** after confirming it no longer offers a persistent free tier; Mistral AI was substituted as a genuinely free third provider, preserving the three-tier fallback design.
+- **Rate-limit handling currently uses provider fallback rather than same-provider retry with backoff** — see Section 2 above for the planned extension.
